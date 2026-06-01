@@ -93,7 +93,7 @@ elif selected_page == "用戶檔案與心率區間":
         st.caption(f"靜息心率來源：{rest_hr_source} → **{effective_rest_hr} bpm**")
 
         st.divider()
-        st.subheader("❤️ Karvonen 公式心率區間（預設顯示）")
+        st.subheader("❤️心率區間")
 
         zones = [
             ("🏃 Zone 1 - 恢復 / 熱身區", 0.50, 0.60),
