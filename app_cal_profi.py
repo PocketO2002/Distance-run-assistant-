@@ -54,7 +54,7 @@ elif selected_page == "用戶檔案與心率區間":
             with col2:
                 max_hr_input = st.number_input("已知最大心率（bpm，可留空）", min_value=0, max_value=220, value=0, step=1, help="留空則自動使用 220 - 年齡")
                 rest_hr_input = st.number_input("已知靜息心率（bpm，可留空）", min_value=0, max_value=120, value=0, step=1, help="留空則預設為 60")
-            submitted = st.form_submit_button("💾 儲存個人資料")
+            submitted = st.form_submit_button("計算")
             if submitted:
                 st.session_state.user_profile = {
                     "name": name,
@@ -63,7 +63,7 @@ elif selected_page == "用戶檔案與心率區間":
                     "max_hr_input": max_hr_input,
                     "rest_hr_input": rest_hr_input
                 }
-                st.success("✅ 個人資料已成功儲存！")
+                st.success("✅ 已計算心率區間！")
                 st.rerun()
 
     if st.session_state.user_profile:
@@ -87,7 +87,7 @@ elif selected_page == "用戶檔案與心率區間":
             rest_hr_source = "你輸入的值"
         else:
             effective_rest_hr = 60
-            rest_hr_source = "預設 60（未輸入）"
+            rest_hr_source = "預設 60"
 
         st.caption(f"最大心率來源：{max_hr_source} → **{effective_max_hr} bpm**")
         st.caption(f"靜息心率來源：{rest_hr_source} → **{effective_rest_hr} bpm**")
@@ -108,10 +108,8 @@ elif selected_page == "用戶檔案與心率區間":
             high_hr = int((effective_max_hr - effective_rest_hr) * high_pct + effective_rest_hr)
             st.write(f"**{zone_name}**：{low_hr} - {high_hr} bpm　（{int(low_pct*100)}% - {int(high_pct*100)}% HRR）")
 
-        st.warning("✅ 使用 Karvonen 公式（較個人化）。")
-
         # === Jack Daniels 心率區間（只保留 Easy、Threshold、Interval） ===
-        show_jd = st.checkbox("📊 顯示 Jack Daniels 心率區間（依影片內容）")
+        show_jd = st.checkbox("📊 顯示 Jack Daniels 心率區間")
         if show_jd:
             st.subheader("Jack Daniels 心率區間（使用 Karvonen 公式）")
             jd_zones = [
