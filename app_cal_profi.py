@@ -33,7 +33,8 @@ if selected_page == "首頁":
     請從左側選單選擇功能開始使用。
     """)
     st.markdown("---")
-    st.warning("目前只開放配速及心率區計算功能“）
+    st.warning ("目前只開放配速及心率區計算功能“
+    )
     st.write("**目前版本**：v0.1（基礎結構版）")
 
 elif selected_page == "用戶檔案與心率區間":
