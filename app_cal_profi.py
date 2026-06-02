@@ -1,4 +1,29 @@
 import streamlit as st
+import json
+import os
+
+# ==================== 持久化設定（解決重新載入資料消失問題） ====================
+DATA_FILE = "running_data.json"
+
+def load_persistent_data():
+    """從硬碟的 JSON 檔案讀取之前儲存的資料（App 啟動時自動呼叫）"""
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            # 檔案損壞時回傳空資料，避免 App 當掉
+            return {}
+    return {}
+
+def save_persistent_data():
+    """將目前的用戶資料和訓練記錄寫入硬碟 JSON 檔案（每次儲存時呼叫）"""
+    data_to_save = {
+        "user_profile": st.session_state.get("user_profile", {}),
+        "running_records": st.session_state.get("running_records", [])
+    }
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data_to_save, f, ensure_ascii=False, indent=2)
 
 # ==================== 頁面基本設定 ====================
 st.set_page_config(
@@ -10,6 +35,13 @@ st.set_page_config(
 
 # ==================== 主標題（所有頁面都會顯示） ====================
 st.title("🏃‍♂️ 跑手助理")
+
+# ==================== 持久化資料初始化（重新載入後資料不會消失） ====================
+if 'data_loaded' not in st.session_state:
+    persistent_data = load_persistent_data()
+    st.session_state.user_profile = persistent_data.get("user_profile", {})
+    st.session_state.running_records = persistent_data.get("running_records", [])
+    st.session_state.data_loaded = True
 
 # ==================== 側邊欄導航 ====================
 st.sidebar.title("🏃‍♂️ 跑手助理")
@@ -33,12 +65,13 @@ if selected_page == "首頁":
     請從左側選單選擇功能開始使用。
     """)
     st.markdown("---")
-    st.info("💡 小提示：建議先到「用戶檔案與心率區間」設定你的個人資料和最大心率。")
-    st.write("**目前版本**：v0.1（基礎結構版）")
+    st.info("💡 小提示：建議先到「用戶檔案與心率區間」設定你的個人資料和最大心率。資料現在會自動儲存到 running_data.json，重新載入網頁也不會消失！")
+    st.write("**目前版本**：v0.2（已加入持久化儲存）")
 
 elif selected_page == "用戶檔案與心率區間":
     st.header("👤 用戶檔案與心率區間")
 
+    # 注意：因為上面已經初始化，這裡的 if 不會再重設為空值
     if 'user_profile' not in st.session_state:
         st.session_state.user_profile = {}
 
@@ -63,7 +96,8 @@ elif selected_page == "用戶檔案與心率區間":
                     "max_hr_input": max_hr_input,
                     "rest_hr_input": rest_hr_input
                 }
-                st.success("✅ 個人資料已成功儲存！")
+                save_persistent_data()   # ← 新增：同時寫入硬碟
+                st.success("✅ 個人資料已成功儲存！（已同步到 running_data.json）")
                 st.rerun()
 
     if st.session_state.user_profile:
@@ -126,14 +160,16 @@ elif selected_page == "用戶檔案與心率區間":
 
         if st.button("✏️ 修改個人資料"):
             st.session_state.user_profile = {}
+            save_persistent_data()   # ← 新增：清空後也同步更新檔案
             st.rerun()
     else:
         st.info("👆 請在上方填寫資料，然後按「儲存個人資料」按鈕。")
 
 elif selected_page == "訓練記錄":
     st.header("📝 訓練記錄（跑步）")
-    st.caption("💡 選擇訓練類型後，先設定 Sets / Reps / Work distance / Rest 時間，再填詳細數據。")
+    st.caption("💡 選擇訓練類型後，先設定 Sets / Reps / Work distance / Rest 時間，再填詳細數據。資料會自動儲存到硬碟。")
 
+    # 注意：因為上面已經初始化，這裡的 if 不會再重設為空 list
     if 'running_records' not in st.session_state:
         st.session_state.running_records = []
 
@@ -236,7 +272,8 @@ elif selected_page == "訓練記錄":
                     new_record["Interval Details"] = interval_details
 
                 st.session_state.running_records.append(new_record)
-                st.success(f"✅ 已儲存！{training_type}　配速：{pace_str}")
+                save_persistent_data()   # ← 新增：同時寫入硬碟
+                st.success(f"✅ 已儲存！{training_type}　配速：{pace_str}（已同步到 running_data.json）")
             else:
                 st.error("❌ 請輸入有效的距離和 mm:ss 時間！")
 
@@ -260,6 +297,7 @@ elif selected_page == "訓練記錄":
 
         if st.button("🗑️ 清空所有跑步記錄（測試用）", type="secondary"):
             st.session_state.running_records = []
+            save_persistent_data()   # ← 新增：清空後也同步更新檔案
             st.rerun()
     else:
         st.info("👆 請選擇類型、設定 Interval 參數（若適用）、填寫資料並儲存。")
@@ -355,6 +393,6 @@ elif selected_page == "訓練歷史":
 
 # ==================== 頁面底部 ====================
 st.markdown("---")
-st.caption("跑手助理 v0.2 | 使用 Python + Streamlit 開發 | 專為香港中學體育教育及跑手設計")
+st.caption("跑手助理 v0.2 | 使用 Python + Streamlit 開發 | 專為香港中學體育教育及跑手設計 | 資料自動儲存到 running_data.json")
 st.sidebar.markdown("---")
-st.sidebar.caption("v0.2 | 跑手助理")
+st.sidebar.caption("v0.2 | 跑手助理 | 資料已持久化")
