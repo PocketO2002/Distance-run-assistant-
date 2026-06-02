@@ -144,7 +144,7 @@ elif selected_page == "訓練記錄":
         index=0
     )
 
-    # 間歇類型設定區（Sets, Reps, Work distance, Rest times）
+    # 間歇類型設定區
     num_sets = 1
     reps_per_set = 1
     total_reps = 1
@@ -173,19 +173,17 @@ elif selected_page == "訓練記錄":
             time_str = st.text_input("⏱️ 總時間（格式：mm:ss，例如 30:00）", value="30:00")
         with col2:
             avg_hr = st.number_input("❤️ 平均心率（bpm）", min_value=0, max_value=220, value=150, step=1)
-            max_hr = st.number_input("💓 最大心率（bpm，可選）", min_value=0, max_value=220, value=0, step=1)
             rpe = st.slider("😓 RPE 主觀疲勞感（1=很輕鬆 ～ 10=極限）", min_value=1, max_value=10, value=5, step=1)
 
         notes = st.text_area("📝 訓練筆記（可選）", height=60)
 
-        # 間歇類型顯示 reps 詳細表格（無 Notes 欄，預填 Work & Rest）
+        # 間歇類型顯示 reps 詳細表格（無 Rest 欄，無 Notes 欄）
         interval_details = []
         if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"]:
             st.markdown("**🔄 Interval Reps Details（每趟數據）**")
             work_default = f"{int(interval_dist)}m"
-            rest_default = f"{int(rest_rep)}s"
             default_data = [
-                {"Rep": i, "Work (m or mm:ss)": work_default, "Rest (s or mm:ss)": rest_default, "Avg HR": 0}
+                {"Rep": i, "Work (m or mm:ss)": work_default, "Avg HR": 0}
                 for i in range(1, total_reps + 1)
             ]
             interval_details = st.data_editor(
@@ -230,7 +228,6 @@ elif selected_page == "訓練記錄":
                     "總時間": time_display,
                     "配速": pace_str,
                     "平均心率": avg_hr if avg_hr > 0 else "-",
-                    "最大心率": max_hr if max_hr > 0 else "-",
                     "RPE": rpe,
                     "筆記": notes.strip() if notes.strip() else "-"
                 }
