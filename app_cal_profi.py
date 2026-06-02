@@ -355,6 +355,6 @@ elif selected_page == "訓練歷史":
 
 # ==================== 頁面底部 ====================
 st.markdown("---")
-st.caption("跑手助理 v0.1 | 使用 Python + Streamlit 開發 | 專為香港中學體育教育及跑手設計")
+st.caption("跑手助理 v0.2 | 使用 Python + Streamlit 開發 | 專為香港中學體育教育及跑手設計")
 st.sidebar.markdown("---")
-st.sidebar.caption("v0.1 | 跑手助理")
+st.sidebar.caption("v0.2 | 跑手助理")
