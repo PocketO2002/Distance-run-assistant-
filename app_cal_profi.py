@@ -58,7 +58,7 @@ if st.session_state.current_user is None:
         username = st.text_input(
             "你的名字 / 學生姓名",
             value="",
-            placeholder="例如：tim、 小明、 教練、 Sarah"
+            placeholder="例如：Jakob, Mo, Kerr, Curry..."
         )
         submitted = st.form_submit_button("✅ 開始使用這個用戶", use_container_width=True)
 
