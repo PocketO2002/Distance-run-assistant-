@@ -4,7 +4,7 @@ import os
 
 # ==================== 多用戶 + 持久化設定 ====================
 def get_current_data_file():
-    """根據目前選擇的用戶，產生對應的 JSON 檔案名稱（例如 running_data_張瑞謙.json）"""
+    """根據目前選擇的用戶，產生對應的 JSON 檔案名稱（例如 running_data_tim.json）"""
     user = st.session_state.get("current_user")
     if user:
         # 安全處理檔名，只保留英數、中文、空格、底線、連字號
@@ -58,7 +58,7 @@ if st.session_state.current_user is None:
         username = st.text_input(
             "你的名字 / 學生姓名",
             value="",
-            placeholder="例如：張瑞謙、 小明、 教練、 Sarah"
+            placeholder="例如：tim、 小明、 教練、 Sarah"
         )
         submitted = st.form_submit_button("✅ 開始使用這個用戶", use_container_width=True)
 
