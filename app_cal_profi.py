@@ -2,27 +2,36 @@ import streamlit as st
 import json
 import os
 
-# ==================== 持久化設定（解決重新載入資料消失問題） ====================
-DATA_FILE = "running_data.json"
+# ==================== 多用戶 + 持久化設定 ====================
+def get_current_data_file():
+    """根據目前選擇的用戶，產生對應的 JSON 檔案名稱（例如 running_data_張瑞謙.json）"""
+    user = st.session_state.get("current_user")
+    if user:
+        # 安全處理檔名，只保留英數、中文、空格、底線、連字號
+        safe_name = "".join(c for c in user if c.isalnum() or c in " _-").strip()
+        if safe_name:
+            return f"running_data_{safe_name}.json"
+    return "running_data.json"
 
 def load_persistent_data():
-    """從硬碟的 JSON 檔案讀取之前儲存的資料（App 啟動時自動呼叫）"""
-    if os.path.exists(DATA_FILE):
+    """從對應用戶的 JSON 檔案讀取資料"""
+    data_file = get_current_data_file()
+    if os.path.exists(data_file):
         try:
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
+            with open(data_file, "r", encoding="utf-8") as f:
                 return json.load(f)
         except:
-            # 檔案損壞時回傳空資料，避免 App 當掉
             return {}
     return {}
 
 def save_persistent_data():
-    """將目前的用戶資料和訓練記錄寫入硬碟 JSON 檔案（每次儲存時呼叫）"""
+    """將資料寫入目前用戶對應的 JSON 檔案"""
+    data_file = get_current_data_file()
     data_to_save = {
         "user_profile": st.session_state.get("user_profile", {}),
         "running_records": st.session_state.get("running_records", [])
     }
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
+    with open(data_file, "w", encoding="utf-8") as f:
         json.dump(data_to_save, f, ensure_ascii=False, indent=2)
 
 # ==================== 頁面基本設定 ====================
@@ -33,18 +42,61 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ==================== 主標題（所有頁面都會顯示） ====================
+# ==================== 主標題 ====================
 st.title("🏃‍♂️ 跑手助理")
 
-# ==================== 持久化資料初始化（重新載入後資料不會消失） ====================
+# ==================== 用戶選擇（類似 Netflix 切換用戶） ====================
+if 'current_user' not in st.session_state:
+    st.session_state.current_user = None
+
+if st.session_state.current_user is None:
+    st.header("👋 歡迎使用跑手助理")
+    st.markdown("### 請選擇或輸入你的名字（每個人有獨立資料）")
+    st.caption("就像 Netflix 一樣，不同用戶的訓練記錄和個人檔案完全分開，互不影響。")
+
+    with st.form(key="user_select_form"):
+        username = st.text_input(
+            "你的名字 / 學生姓名",
+            value="",
+            placeholder="例如：張瑞謙、 小明、 教練、 Sarah"
+        )
+        submitted = st.form_submit_button("✅ 開始使用這個用戶", use_container_width=True)
+
+        if submitted:
+            if username.strip():
+                st.session_state.current_user = username.strip()
+                st.success(f"歡迎回來，{st.session_state.current_user}！你的資料會自動儲存。")
+                st.rerun()
+            else:
+                st.error("請輸入名字！")
+
+    st.info("💡 提示：下次開啟 App 時，只要輸入同樣的名字，就能看到你之前的訓練記錄和心率區間設定。")
+    st.stop()   # 重要：還沒選擇用戶時，停止執行下面所有程式碼
+
+# ==================== 資料初始化（只有選擇用戶後才執行） ====================
 if 'data_loaded' not in st.session_state:
     persistent_data = load_persistent_data()
     st.session_state.user_profile = persistent_data.get("user_profile", {})
     st.session_state.running_records = persistent_data.get("running_records", [])
     st.session_state.data_loaded = True
 
-# ==================== 側邊欄導航 ====================
+# ==================== 側邊欄 ====================
 st.sidebar.title("🏃‍♂️ 跑手助理")
+st.sidebar.markdown("---")
+
+# 顯示目前用戶 + 切換按鈕（Netflix 風格）
+st.sidebar.success(f"👤 目前用戶：**{st.session_state.current_user}**")
+if st.sidebar.button("🔄 切換 / 新增用戶", use_container_width=True):
+    st.session_state.current_user = None
+    # 清除舊資料，避免混淆
+    if 'user_profile' in st.session_state:
+        del st.session_state.user_profile
+    if 'running_records' in st.session_state:
+        del st.session_state.running_records
+    if 'data_loaded' in st.session_state:
+        del st.session_state.data_loaded
+    st.rerun()
+
 st.sidebar.markdown("---")
 selected_page = st.sidebar.radio(
     " ",
@@ -54,7 +106,7 @@ selected_page = st.sidebar.radio(
 
 # ==================== 各功能頁面 ====================
 if selected_page == "首頁":
-    st.markdown("### 專為你和你的學生設計的跑步訓練助手")
+    st.markdown(f"### 專為 {st.session_state.current_user} 設計的跑步訓練助手")
     st.write("""
     歡迎使用「跑手助理」！
     這個應用程式專為跑手及教練而設，主要功能包括：
@@ -65,13 +117,12 @@ if selected_page == "首頁":
     請從左側選單選擇功能開始使用。
     """)
     st.markdown("---")
-    st.info("💡 小提示：建議先到「用戶檔案與心率區間」設定你的個人資料和最大心率。資料現在會自動儲存到 running_data.json，重新載入網頁也不會消失！")
-    st.write("**目前版本**：v0.2（已加入持久化儲存）")
+    st.info("💡 小提示：建議先到「用戶檔案與心率區間」設定你的個人資料和最大心率。你的資料會自動儲存到獨立的檔案，重新載入也不會消失！")
+    st.write("**目前版本**：v0.3（多用戶獨立資料版）")
 
 elif selected_page == "用戶檔案與心率區間":
     st.header("👤 用戶檔案與心率區間")
 
-    # 注意：因為上面已經初始化，這裡的 if 不會再重設為空值
     if 'user_profile' not in st.session_state:
         st.session_state.user_profile = {}
 
@@ -96,8 +147,8 @@ elif selected_page == "用戶檔案與心率區間":
                     "max_hr_input": max_hr_input,
                     "rest_hr_input": rest_hr_input
                 }
-                save_persistent_data()   # ← 新增：同時寫入硬碟
-                st.success("✅ 個人資料已成功儲存！（已同步到 running_data.json）")
+                save_persistent_data()
+                st.success(f"✅ 個人資料已成功儲存！（已同步到 {get_current_data_file()}）")
                 st.rerun()
 
     if st.session_state.user_profile:
@@ -105,7 +156,6 @@ elif selected_page == "用戶檔案與心率區間":
         st.subheader(f"歡迎，{profile.get('name', '跑手')}！")
         st.write(f"**性別**：{profile.get('sex', '未設定')}　　**年齡**：{profile.get('age', '未設定')} 歲")
 
-        # 決定使用哪個最大心率與靜息心率
         age_val = profile.get("age", 25)
         max_hr_input = profile.get("max_hr_input", 0)
         if max_hr_input > 0:
@@ -144,7 +194,6 @@ elif selected_page == "用戶檔案與心率區間":
 
         st.warning("✅ 使用 Karvonen 公式（較個人化）。")
 
-        # === Jack Daniels 心率區間（只保留 Easy、Threshold、Interval） ===
         show_jd = st.checkbox("📊 顯示 Jack Daniels 心率區間（依影片內容）")
         if show_jd:
             st.subheader("Jack Daniels 心率區間（使用 Karvonen 公式）")
@@ -160,27 +209,24 @@ elif selected_page == "用戶檔案與心率區間":
 
         if st.button("✏️ 修改個人資料"):
             st.session_state.user_profile = {}
-            save_persistent_data()   # ← 新增：清空後也同步更新檔案
+            save_persistent_data()
             st.rerun()
     else:
         st.info("👆 請在上方填寫資料，然後按「儲存個人資料」按鈕。")
 
 elif selected_page == "訓練記錄":
     st.header("📝 訓練記錄（跑步）")
-    st.caption("💡 選擇訓練類型後，先設定 Sets / Reps / Work distance / Rest 時間，再填詳細數據。資料會自動儲存到硬碟。")
+    st.caption("💡 選擇訓練類型後，先設定 Sets / Reps / Work distance / Rest 時間，再填詳細數據。資料會自動儲存到你專屬的檔案。")
 
-    # 注意：因為上面已經初始化，這裡的 if 不會再重設為空 list
     if 'running_records' not in st.session_state:
         st.session_state.running_records = []
 
-    # 訓練類型選擇
     training_type = st.selectbox(
         "🏃 訓練類型",
         ["Easy", "Tempo", "Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"],
         index=0
     )
 
-    # 間歇類型設定區
     num_sets = 1
     reps_per_set = 1
     total_reps = 1
@@ -213,7 +259,6 @@ elif selected_page == "訓練記錄":
 
         notes = st.text_area("📝 訓練筆記（可選）", height=60)
 
-        # 間歇類型顯示 reps 詳細表格（無 Rest 欄，無 Notes 欄）
         interval_details = []
         if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"]:
             st.markdown("**🔄 Interval Reps Details（每趟數據）**")
@@ -272,8 +317,8 @@ elif selected_page == "訓練記錄":
                     new_record["Interval Details"] = interval_details
 
                 st.session_state.running_records.append(new_record)
-                save_persistent_data()   # ← 新增：同時寫入硬碟
-                st.success(f"✅ 已儲存！{training_type}　配速：{pace_str}（已同步到 running_data.json）")
+                save_persistent_data()
+                st.success(f"✅ 已儲存！{training_type}　配速：{pace_str}（已同步到 {get_current_data_file()}）")
             else:
                 st.error("❌ 請輸入有效的距離和 mm:ss 時間！")
 
@@ -297,7 +342,7 @@ elif selected_page == "訓練記錄":
 
         if st.button("🗑️ 清空所有跑步記錄（測試用）", type="secondary"):
             st.session_state.running_records = []
-            save_persistent_data()   # ← 新增：清空後也同步更新檔案
+            save_persistent_data()
             st.rerun()
     else:
         st.info("👆 請選擇類型、設定 Interval 參數（若適用）、填寫資料並儲存。")
@@ -329,7 +374,6 @@ elif selected_page == "配速計算器":
             key="time_text",
             label_visibility="collapsed"
         )
-        # 解析時間字串
         total_time_sec = 0
         if time_str:
             parts = time_str.split(":")
@@ -355,14 +399,12 @@ elif selected_page == "配速計算器":
             ps = st.number_input("秒", min_value=0, max_value=59, value=0, step=1, key="p_sec", label_visibility="visible")
         total_pace_sec = pm * 60 + ps
 
-    # 自動計算邏輯
     st.divider()
     if dist > 0 and total_time_sec > 0 and total_pace_sec == 0:
         pace_sec_per_km = total_time_sec / dist
         pace_min = int(pace_sec_per_km // 60)
         pace_sec = int(pace_sec_per_km % 60)
 
-        # 新增：400m 配速 + 速度
         pace_400_sec_total = pace_sec_per_km * 0.4
         pace_400_min = int(pace_400_sec_total // 60)
         pace_400_sec = int(pace_400_sec_total % 60)
@@ -393,6 +435,6 @@ elif selected_page == "訓練歷史":
 
 # ==================== 頁面底部 ====================
 st.markdown("---")
-st.caption("跑手助理 v0.2 | 使用 Python + Streamlit 開發 | 專為香港中學體育教育及跑手設計 | 資料自動儲存到 running_data.json")
+st.caption(f"跑手助理 v0.3 | 多用戶獨立資料版 | 目前用戶：{st.session_state.current_user} | 使用 Python + Streamlit 開發")
 st.sidebar.markdown("---")
-st.sidebar.caption("v0.2 | 跑手助理 | 資料已持久化")
+st.sidebar.caption(f"v0.3 | {st.session_state.current_user} 的專屬資料")
