@@ -33,7 +33,7 @@ if selected_page == "首頁":
     請從左側選單選擇功能開始使用。
     """)
     st.markdown("---")
-    st.warning ("目前只開放配速及心率區計算功能 ")
+    st.info("💡 小提示：建議先到「用戶檔案與心率區間」設定你的個人資料和最大心率。")
     st.write("**目前版本**：v0.1（基礎結構版）")
 
 elif selected_page == "用戶檔案與心率區間":
@@ -54,7 +54,7 @@ elif selected_page == "用戶檔案與心率區間":
             with col2:
                 max_hr_input = st.number_input("已知最大心率（bpm，可留空）", min_value=0, max_value=220, value=0, step=1, help="留空則自動使用 220 - 年齡")
                 rest_hr_input = st.number_input("已知靜息心率（bpm，可留空）", min_value=0, max_value=120, value=0, step=1, help="留空則預設為 60")
-            submitted = st.form_submit_button("計算")
+            submitted = st.form_submit_button("💾 儲存個人資料")
             if submitted:
                 st.session_state.user_profile = {
                     "name": name,
@@ -63,7 +63,7 @@ elif selected_page == "用戶檔案與心率區間":
                     "max_hr_input": max_hr_input,
                     "rest_hr_input": rest_hr_input
                 }
-                st.success("✅ 已計算心率區間！")
+                st.success("✅ 個人資料已成功儲存！")
                 st.rerun()
 
     if st.session_state.user_profile:
@@ -87,13 +87,13 @@ elif selected_page == "用戶檔案與心率區間":
             rest_hr_source = "你輸入的值"
         else:
             effective_rest_hr = 60
-            rest_hr_source = "預設 60"
+            rest_hr_source = "預設 60（未輸入）"
 
         st.caption(f"最大心率來源：{max_hr_source} → **{effective_max_hr} bpm**")
         st.caption(f"靜息心率來源：{rest_hr_source} → **{effective_rest_hr} bpm**")
 
         st.divider()
-        st.subheader("❤️心率區間")
+        st.subheader("❤️ Karvonen 公式心率區間（預設顯示）")
 
         zones = [
             ("🏃 Zone 1 - 恢復 / 熱身區", 0.50, 0.60),
@@ -108,8 +108,10 @@ elif selected_page == "用戶檔案與心率區間":
             high_hr = int((effective_max_hr - effective_rest_hr) * high_pct + effective_rest_hr)
             st.write(f"**{zone_name}**：{low_hr} - {high_hr} bpm　（{int(low_pct*100)}% - {int(high_pct*100)}% HRR）")
 
+        st.warning("✅ 使用 Karvonen 公式（較個人化）。")
+
         # === Jack Daniels 心率區間（只保留 Easy、Threshold、Interval） ===
-        show_jd = st.checkbox("📊 顯示 Jack Daniels 心率區間")
+        show_jd = st.checkbox("📊 顯示 Jack Daniels 心率區間（依影片內容）")
         if show_jd:
             st.subheader("Jack Daniels 心率區間（使用 Karvonen 公式）")
             jd_zones = [
@@ -129,9 +131,141 @@ elif selected_page == "用戶檔案與心率區間":
         st.info("👆 請在上方填寫資料，然後按「儲存個人資料」按鈕。")
 
 elif selected_page == "訓練記錄":
-    st.header("📝 訓練記錄")
-    st.write("用來記錄每次的跑步訓練或力量訓練，包括日期、距離、時間、心率、RPE 等資料。")
-    st.warning("⚠️ 此功能尚未實作。我們會在下一階段加入表單輸入與資料儲存功能。")
+    st.header("📝 訓練記錄（跑步）")
+    st.caption("💡 選擇訓練類型後，先設定 Sets / Reps / Work distance / Rest 時間，再填詳細數據。")
+
+    if 'running_records' not in st.session_state:
+        st.session_state.running_records = []
+
+    # 訓練類型選擇
+    training_type = st.selectbox(
+        "🏃 訓練類型",
+        ["Easy", "Tempo", "Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"],
+        index=0
+    )
+
+    # 間歇類型設定區（Sets, Reps, Work distance, Rest times）
+    num_sets = 1
+    reps_per_set = 1
+    total_reps = 1
+    interval_dist = 400
+    rest_rep = 30
+    rest_set = 2
+    if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"]:
+        st.markdown("**🔢 Interval 設定（決定表格大小 + 預設值）**")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            num_sets = st.number_input("Sets", min_value=1, max_value=10, value=4, step=1)
+        with col2:
+            reps_per_set = st.number_input("Reps/set", min_value=1, max_value=20, value=5, step=1)
+        with col3:
+            interval_dist = st.number_input("Work/rep (m)", min_value=50, max_value=2000, value=400, step=50)
+        with col4:
+            rest_rep = st.number_input("Rest/rep (s)", min_value=0, max_value=300, value=30, step=5)
+        rest_set = st.number_input("Rest/set (min)", min_value=0, max_value=10, value=2, step=1)
+        total_reps = num_sets * reps_per_set
+
+    with st.form(key="running_record_form", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            record_date = st.date_input("📅 日期", value="today")
+            distance = st.number_input("📏 總距離（公里）", min_value=0.1, max_value=100.0, value=5.0, step=0.1)
+            time_str = st.text_input("⏱️ 總時間（格式：mm:ss，例如 30:00）", value="30:00")
+        with col2:
+            avg_hr = st.number_input("❤️ 平均心率（bpm）", min_value=0, max_value=220, value=150, step=1)
+            max_hr = st.number_input("💓 最大心率（bpm，可選）", min_value=0, max_value=220, value=0, step=1)
+            rpe = st.slider("😓 RPE 主觀疲勞感（1=很輕鬆 ～ 10=極限）", min_value=1, max_value=10, value=5, step=1)
+
+        notes = st.text_area("📝 訓練筆記（可選）", height=60)
+
+        # 間歇類型顯示 reps 詳細表格（無 Notes 欄，預填 Work & Rest）
+        interval_details = []
+        if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"]:
+            st.markdown("**🔄 Interval Reps Details（每趟數據）**")
+            work_default = f"{int(interval_dist)}m"
+            rest_default = f"{int(rest_rep)}s"
+            default_data = [
+                {"Rep": i, "Work (m or mm:ss)": work_default, "Rest (s or mm:ss)": rest_default, "Avg HR": 0}
+                for i in range(1, total_reps + 1)
+            ]
+            interval_details = st.data_editor(
+                default_data,
+                num_rows="dynamic",
+                use_container_width=True,
+                key="interval_editor"
+            )
+
+        submitted = st.form_submit_button("💾 儲存這次跑步記錄", use_container_width=True)
+
+        if submitted:
+            total_seconds = 0
+            if time_str:
+                try:
+                    parts = time_str.strip().split(":")
+                    if len(parts) == 2:
+                        m = int(parts[0])
+                        s = int(parts[1])
+                        total_seconds = m * 60 + s
+                    elif len(parts) == 1:
+                        total_seconds = int(parts[0]) * 60
+                except:
+                    total_seconds = 0
+
+            if distance > 0 and total_seconds > 0:
+                pace_sec_per_km = total_seconds / distance
+                pace_min = int(pace_sec_per_km // 60)
+                pace_sec = int(pace_sec_per_km % 60)
+                pace_str = f"{pace_min}:{pace_sec:02d}/km"
+                time_display = f"{int(total_seconds//60)}:{int(total_seconds%60):02d}"
+
+                new_record = {
+                    "日期": str(record_date),
+                    "訓練類型": training_type,
+                    "Sets": num_sets if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"] else "-",
+                    "Reps/set": reps_per_set if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"] else "-",
+                    "Work/rep (m)": interval_dist if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"] else "-",
+                    "Rest/rep (s)": rest_rep if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"] else "-",
+                    "Rest/set (min)": rest_set if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"] else "-",
+                    "總距離(km)": round(distance, 2),
+                    "總時間": time_display,
+                    "配速": pace_str,
+                    "平均心率": avg_hr if avg_hr > 0 else "-",
+                    "最大心率": max_hr if max_hr > 0 else "-",
+                    "RPE": rpe,
+                    "筆記": notes.strip() if notes.strip() else "-"
+                }
+
+                if interval_details:
+                    new_record["Interval Details"] = interval_details
+
+                st.session_state.running_records.append(new_record)
+                st.success(f"✅ 已儲存！{training_type}　配速：{pace_str}")
+            else:
+                st.error("❌ 請輸入有效的距離和 mm:ss 時間！")
+
+    st.divider()
+    st.subheader("📊 最近跑步記錄（最新 5 筆）")
+
+    if st.session_state.running_records:
+        recent_records = st.session_state.running_records[-5:][::-1]
+        st.dataframe(recent_records, use_container_width=True, hide_index=True)
+
+        col_a, col_b, col_c = st.columns(3)
+        total_distance = sum(r.get("總距離(km)", 0) for r in st.session_state.running_records)
+        total_runs = len(st.session_state.running_records)
+
+        with col_a:
+            st.metric("總跑步距離", f"{total_distance:.1f} km")
+        with col_b:
+            st.metric("記錄筆數", f"{total_runs} 次")
+        with col_c:
+            st.metric("平均配速", "見記錄表")
+
+        if st.button("🗑️ 清空所有跑步記錄（測試用）", type="secondary"):
+            st.session_state.running_records = []
+            st.rerun()
+    else:
+        st.info("👆 請選擇類型、設定 Interval 參數（若適用）、填寫資料並儲存。")
 
 elif selected_page == "配速計算器":
     st.header("🏃 配速計算器")
