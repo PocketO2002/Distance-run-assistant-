@@ -51,14 +51,14 @@ if 'current_user' not in st.session_state:
 
 if st.session_state.current_user is None:
     st.header("👋 歡迎使用跑手助理")
-    st.markdown("### 請選擇或輸入你的名字（每個人有獨立資料）")
+    st.markdown("### 請輸入你的名字（每個人有獨立資料）")
     st.caption("就像 Netflix 一樣，不同用戶的訓練記錄和個人檔案完全分開，互不影響。")
 
     with st.form(key="user_select_form"):
         username = st.text_input(
             "你的名字 / 學生姓名",
             value="",
-            placeholder="例如：tim、 小明、 教練、 Sarah"
+            placeholder="例如：Tim, Chloe, 小明, X教練"
         )
         submitted = st.form_submit_button("✅ 開始使用這個用戶", use_container_width=True)
 
@@ -132,7 +132,7 @@ elif selected_page == "用戶檔案與心率區間":
         with st.form(key="profile_form"):
             col1, col2 = st.columns(2)
             with col1:
-                name = st.text_input("姓名", value="")
+                name = {st.session_state.current_user}
                 sex = st.selectbox("性別", options=["男", "女"])
                 age = st.number_input("年齡（歲）", min_value=10, max_value=100, value=25, step=1)
             with col2:
