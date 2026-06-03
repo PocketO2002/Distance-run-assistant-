@@ -1,6 +1,8 @@
 import streamlit as st
 import json
 import os
+import pandas as pd
+import matplotlib.pyplot as plt
 
 # ==================== 多用戶 + 持久化設定 ====================
 def get_current_data_file():
@@ -230,7 +232,7 @@ elif selected_page == "訓練記錄":
     num_sets = 1
     reps_per_set = 1
     total_reps = 1
-    interval_dist = 400
+    work_rep = "400"
     rest_rep = 30
     rest_set = 2
     if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"]:
@@ -241,11 +243,80 @@ elif selected_page == "訓練記錄":
         with col2:
             reps_per_set = st.number_input("Reps/set", min_value=1, max_value=20, value=5, step=1)
         with col3:
-            interval_dist = st.number_input("Work/rep (m)", min_value=50, max_value=2000, value=400, step=50)
+            work_rep = st.text_input("Work/rep (m 或 mm:ss，例如 400 或 1:30)", value="400")
         with col4:
             rest_rep = st.number_input("Rest/rep (s)", min_value=0, max_value=300, value=30, step=5)
         rest_set = st.number_input("Rest/set (min)", min_value=0, max_value=10, value=2, step=1)
         total_reps = num_sets * reps_per_set
+
+    # ==================== Interval Reps Details + 即時圖表（移出 form，編輯即更新） ====================
+    interval_details = []
+    if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"]:
+        st.markdown("**🔄 Interval Reps Details（每趟數據）**　填「時間 (mm:ss)」後圖表即時更新")
+        work_default = work_rep
+        default_data = [
+            {"Rep": i, "Work (m or mm:ss)": work_default, "時間 (mm:ss)": "0:45", "Avg HR": 160}
+            for i in range(1, total_reps + 1)
+        ]
+        interval_details = st.data_editor(
+            default_data,
+            num_rows="dynamic",
+            use_container_width=True,
+            key="interval_editor"
+        )
+
+        # 即時顯示 pace vs time + HR vs time 單一圖表（雙 Y 軸）
+        if interval_details:
+            try:
+                df = pd.DataFrame(interval_details)
+                cum_times = []
+                pace_list = []
+                hr_list = []
+                cum_s = 0
+                for _, row in df.iterrows():
+                    t_str = str(row.get("時間 (mm:ss)", "0:00"))
+                    t_sec = 0
+                    if ":" in t_str:
+                        p = t_str.split(":")
+                        t_sec = int(p[0]) * 60 + int(p[1]) if len(p) == 2 else int(p[0])
+                    else:
+                        try:
+                            t_sec = int(float(t_str))
+                        except:
+                            t_sec = 0
+                    cum_s += t_sec
+                    cum_times.append(round(cum_s / 60, 1))
+                    hr_list.append(row.get("Avg HR", 0))
+                    w_str = str(row.get("Work (m or mm:ss)", "0")).strip()
+                    p_val = None
+                    try:
+                        w_m = float(w_str)
+                        if w_m > 50 and t_sec > 5:
+                            p_val = round((t_sec / 60) / (w_m / 1000), 2)
+                    except:
+                        pass
+                    pace_list.append(p_val)
+                gdf = pd.DataFrame({
+                    "累積時間(分)": cum_times,
+                    "配速(min/km)": pace_list,
+                    "心率(bpm)": hr_list
+                })
+                st.markdown("#### 📈 即時圖表：配速 vs 時間 + 心率 vs 時間（雙軸單圖）")
+                fig, ax1 = plt.subplots(figsize=(8, 3.5))
+                ax1.plot(gdf["累積時間(分)"], gdf["配速(min/km)"], 'o-', color="#1f77b4", label="配速")
+                ax1.set_xlabel("累積時間 (分鐘)")
+                ax1.set_ylabel("配速 (min/km)", color="#1f77b4")
+                ax1.tick_params(axis='y', labelcolor="#1f77b4")
+                ax1.invert_yaxis()
+                ax2 = ax1.twinx()
+                ax2.plot(gdf["累積時間(分)"], gdf["心率(bpm)"], 's--', color="#d62728", label="心率")
+                ax2.set_ylabel("心率 (bpm)", color="#d62728")
+                ax2.tick_params(axis='y', labelcolor="#d62728")
+                plt.title(f"{training_type} Interval 配速與心率變化")
+                fig.legend(loc="upper left", bbox_to_anchor=(0.15, 0.88))
+                st.pyplot(fig)
+            except Exception as e:
+                st.caption(f"圖表預覽提示：請填寫時間與心率 ({e})")
 
     with st.form(key="running_record_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
@@ -258,21 +329,6 @@ elif selected_page == "訓練記錄":
             rpe = st.slider("😓 RPE 主觀疲勞感（1=很輕鬆 ～ 10=極限）", min_value=1, max_value=10, value=5, step=1)
 
         notes = st.text_area("📝 訓練筆記（可選）", height=60)
-
-        interval_details = []
-        if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"]:
-            st.markdown("**🔄 Interval Reps Details（每趟數據）**")
-            work_default = f"{int(interval_dist)}m"
-            default_data = [
-                {"Rep": i, "Work (m or mm:ss)": work_default, "Avg HR": 0}
-                for i in range(1, total_reps + 1)
-            ]
-            interval_details = st.data_editor(
-                default_data,
-                num_rows="dynamic",
-                use_container_width=True,
-                key="interval_editor"
-            )
 
         submitted = st.form_submit_button("💾 儲存這次跑步記錄", use_container_width=True)
 
@@ -302,7 +358,7 @@ elif selected_page == "訓練記錄":
                     "訓練類型": training_type,
                     "Sets": num_sets if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"] else "-",
                     "Reps/set": reps_per_set if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"] else "-",
-                    "Work/rep (m)": interval_dist if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"] else "-",
+                    "Work/rep (m or time)": work_rep if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"] else "-",
                     "Rest/rep (s)": rest_rep if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"] else "-",
                     "Rest/set (min)": rest_set if training_type in ["Short Threshold", "Long Threshold", "VO2 Max Interval", "Specific Interval"] else "-",
                     "總距離(km)": round(distance, 2),
